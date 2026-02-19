@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RailSmart — Intelligent Seat Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Unbounded:wght@300;400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c12;
+    --surface: #0e1520;
+    --surface2: #151e2e;
+    --border: #1e2d45;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #39ff8f;
+    --warn: #ffcc00;
+    --text: #c8d8f0;
+    --muted: #4a6080;
+    --confirmed: #39ff8f;
+    --rac: #ffcc00;
+    --vacant: #ff4d6d;
+    --moving: #00e5ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(8,12,18,0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(0,229,255,0.4); }
+    50% { opacity: 0.8; transform: scale(1.1); box-shadow: 0 0 0 6px rgba(0,229,255,0); }
+  }
+
+  .train-info {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .train-info span { color: var(--accent); }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(57,255,143,0.1);
+    border: 1px solid rgba(57,255,143,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--confirmed);
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 1px;
+  }
+
+  .live-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--confirmed);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .hero {
+    margin-bottom: 40px;
+  }
+
+  .hero h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(24px, 4vw, 42px);
+    font-weight: 700;
+    line-height: 1.1;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 500px;
+  }
+
+  /* Stats Row */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .stat-card.confirmed::after { background: var(--confirmed); }
+  .stat-card.rac::after { background: var(--rac); }
+  .stat-card.vacant::after { background: var(--vacant); }
+  .stat-card.moving::after { background: var(--moving); }
+  .stat-card.waitlist::after { background: var(--accent2); }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .stat-value {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Main layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+
+  /* Coach View */
+  .coach-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+
+  .coach-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .coach-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .coach-tab.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+
+  .coach-tab:hover:not(.active) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Seat Grid */
+  .coach-body {
+    padding: 24px;
+  }
+
+  .seat-legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+
+  .seat-compartments {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .compartment {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .comp-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  .seat-row {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+  }
+
+  .seat-divider {
+    width: 1px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
+  .seat {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-family: 'DM Mono', monospace;
+    position: relative;
+    transition: all 0.2s;
+    min-height: 48px;
+  }
+
+  .seat:hover { transform: scale(1.1); z-index: 10; }
+
+  .seat.confirmed {
+    background: rgba(57,255,143,0.08);
+    border-color: rgba(57,255,143,0.4);
+    color: var(--confirmed);
+  }
+
+  .seat.vacant {
+    background: rgba(255,77,109,0.08);
+    border-color: rgba(255,77,109,0.4);
+    color: var(--vacant);
+  }
+
+  .seat.rac {
+    background: rgba(255,204,0,0.08);
+    border-color: rgba(255,204,0,0.4);
+    color: var(--rac);
+  }
+
+  .seat.moving {
+    background: rgba(0,229,255,0.08);
+    border-color: rgba(0,229,255,0.5);
+    color: var(--moving);
+    animation: seat-pulse 2s infinite;
+  }
+
+  .seat.selected {
+    transform: scale(1.15);
+    box-shadow: 0 0 20px rgba(0,229,255,0.5);
+    border-color: var(--accent) !important;
+    z-index: 20;
+  }
+
+  @keyframes seat-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,229,255,0.3); }
+    50% { box-shadow: 0 0 0 4px rgba(0,229,255,0); }
+  }
+
+  .seat-num {
+    font-weight: 500;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .seat-berth {
+    font-size: 8px;
+    opacity: 0.7;
+    margin-top: 2px;
+  }
+
+  .seat-icon {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* Right Sidebar */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sidebar-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* QR Scan Panel */
+  .qr-panel {
+    padding: 24px;
+    text-align: center;
+  }
+
+  .qr-box {
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 16px;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: rgba(0,229,255,0.03);
+    animation: qr-glow 3s infinite;
+  }
+
+  @keyframes qr-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,229,255,0.2); }
+    50% { box-shadow: 0 0 40px rgba(0,229,255,0.4); }
+  }
+
+  .qr-box::before, .qr-box::after {
+    content: '';
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+
+  .qr-box::before { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+  .qr-box::after { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+  .qr-inner {
+    font-size: 48px;
+    opacity: 0.6;
+    filter: drop-shadow(0 0 10px rgba(0,229,255,0.5));
+  }
+
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scan 2s infinite;
+    top: 0;
+  }
+
+  @keyframes scan {
+    0% { top: 0; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
+  }
+
+  .qr-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .qr-sub { font-size: 12px; color: var(--muted); }
+
+  .scan-btn {
+    margin-top: 16px;
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .scan-btn:hover {
+    background: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(0,229,255,0.3);
+  }
+
+  /* Activity Feed */
+  .activity-list {
+    padding: 0 16px 16px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .activity-list::-webkit-scrollbar { width: 4px; }
+  .activity-list::-webkit-scrollbar-track { background: transparent; }
+  .activity-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .activity-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    animation: slideIn 0.4s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .activity-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .activity-icon.scan { background: rgba(57,255,143,0.15); }
+  .activity-icon.upgrade { background: rgba(0,229,255,0.15); }
+  .activity-icon.swap { background: rgba(255,107,53,0.15); }
+  .activity-icon.vacant { background: rgba(255,77,109,0.15); }
+
+  .activity-text { font-size: 12px; line-height: 1.5; color: var(--text); }
+  .activity-text strong { color: #fff; font-weight: 500; }
+  .activity-time { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+
+  /* Consent Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8,12,18,0.9);
+    backdrop-filter: blur(10px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    width: 420px;
+    max-width: 90vw;
+    transform: scale(0.95);
+    transition: transform 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .modal-overlay.active .modal { transform: scale(1); }
+
+  .modal::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+  }
+
+  .modal-type {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 16px;
+  }
+
+  .modal-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  .modal-desc { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+
+  .passenger-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .pax-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .pax-name { font-weight: 500; font-size: 13px; color: #fff; margin-bottom: 4px; }
+  .pax-seat { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+
+  .arrow-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--accent);
+  }
+
+  .modal-actions { display: flex; gap: 12px; }
+
+  .btn-consent {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-accept {
+    background: var(--accent3);
+    color: #000;
+  }
+
+  .btn-accept:hover { background: #fff; transform: translateY(-1px); }
+
+  .btn-decline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .btn-decline:hover { border-color: var(--vacant); color: var(--vacant); }
+
+  /* RAC upgrade panel */
+  .rac-panel {
+    padding: 16px;
+  }
+
+  .rac-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface2);
+    border: 1px solid rgba(255,204,0,0.2);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+
+  .rac-item:hover { border-color: rgba(255,204,0,0.5); }
+
+  .rac-avatar {
+    width: 36px; height: 36px;
+    background: rgba(255,204,0,0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .rac-info { flex: 1; }
+  .rac-name { font-size: 13px; font-weight: 500; color: #fff; }
+  .rac-detail { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  .upgrade-badge {
+    padding: 4px 10px;
+    background: rgba(57,255,143,0.15);
+    border: 1px solid rgba(57,255,143,0.3);
+    border-radius: 20px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--confirmed);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .upgrade-badge:hover {
+    background: rgba(57,255,143,0.3);
+    transform: scale(1.05);
+  }
+
+  /* Progress timeline */
+  .journey-timeline {
+    padding: 16px 24px;
+  }
+
+  .timeline-track {
+    position: relative;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 20px 0;
+  }
+
+  .timeline-progress {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    width: 38%;
+    transition: width 1s;
+  }
+
+  .timeline-dot {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+  }
+
+  .timeline-stations {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+  }
+
+  .timeline-stations .active-st { color: var(--accent); }
+
+  /* Toast notification */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 280px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: toastIn 0.4s ease;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .toast-icon { font-size: 20px; }
+  .toast-text { font-size: 12px; line-height: 1.4; }
+  .toast-text strong { display: block; color: #fff; margin-bottom: 2px; font-size: 13px; }
+
+  /* responsive */
+  @media (max-width: 1024px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 16px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .seat-row { grid-template-columns: repeat(6, 1fr); }
+  }
+
+  .badge {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+  }
+
+  .badge-green { background: rgba(57,255,143,0.15); color: var(--confirmed); }
+  .badge-cyan { background: rgba(0,229,255,0.15); color: var(--moving); }
+
+  .flex { display: flex; align-items: center; gap: 8px; }
+
+  /* scrollable family group */
+  .family-groups {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .family-group {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .family-group:hover { border-color: var(--accent2); }
+  .family-group.split { border-color: rgba(255,107,53,0.4); }
+  .family-group.together { border-color: rgba(57,255,143,0.3); }
+
+  .family-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .family-name { font-size: 13px; font-weight: 500; color: #fff; }
+
+  .family-seats {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .family-seat-tag {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .seat-tag-same { background: rgba(57,255,143,0.15); color: var(--confirmed); }
+  .seat-tag-diff { background: rgba(255,107,53,0.15); color: var(--accent2); }
+
+  .merge-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px;
+    background: rgba(255,107,53,0.15);
+    border: 1px solid rgba(255,107,53,0.3);
+    border-radius: 6px;
+    color: var(--accent2);
+    font-size: 11px;
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .merge-btn:hover { background: rgba(255,107,53,0.3); }
+
+  .section-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin: 16px 24px;
+  }
+
+  .section-tab {
+    flex: 1;
+    padding: 7px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+  }
+
+  .section-tab.active {
+    background: var(--surface);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    RailSmart
+  </div>
+  <div class="train-info">
+    <span>12951 RAJDHANI EXP</span>
+    <span>NDLS → MMCT</span>
+    <span>DEP: 16:55 · ARR: 08:35+1</span>
+  </div>
+  <div class="live-badge">LIVE</div>
+</div>
+
+<div class="container">
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Seat Management <em>Dashboard</em></h1>
+    <p>Real-time seat validation, dynamic re-clustering, and RAC upgrades — all in one system.</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card confirmed">
+      <div class="stat-label">Confirmed</div>
+      <div class="stat-value" id="s-confirmed">312</div>
+      <div class="stat-sub">Scanned & validated</div>
+    </div>
+    <div class="stat-card rac">
+      <div class="stat-label">RAC Holders</div>
+      <div class="stat-value" id="s-rac">28</div>
+      <div class="stat-sub">Awaiting upgrade</div>
+    </div>
+    <div class="stat-card vacant">
+      <div class="stat-label">No-Shows</div>
+      <div class="stat-value" id="s-vacant">14</div>
+      <div class="stat-sub">Unscanned after dep.</div>
+    </div>
+    <div class="stat-card moving">
+      <div class="stat-label">Pending Swaps</div>
+      <div class="stat-value" id="s-swaps">6</div>
+      <div class="stat-sub">Awaiting consent</div>
+    </div>
+    <div class="stat-card waitlist">
+      <div class="stat-label">Upgraded Today</div>
+      <div class="stat-value" id="s-upgraded">9</div>
+      <div class="stat-sub">RAC → Confirmed</div>
+    </div>
+  </div>
+
+  <!-- Journey Bar -->
+  <div class="sidebar-card" style="margin-bottom:24px;">
+    <div class="journey-timeline">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="font-family:'Unbounded',sans-serif;font-size:12px;color:#fff;font-weight:700;">Journey Progress</div>
+        <div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);">Departed 02:10 ago · ETA 13h 25m</div>
+      </div>
+      <div class="timeline-track">
+        <div class="timeline-progress"></div>
+        <div class="timeline-dot" style="left:38%;"></div>
+      </div>
+      <div class="timeline-stations">
+        <span class="active-st">● NDLS</span>
+        <span>Mathura</span>
+        <span class="active-st" style="color:var(--warn);">▶ Kota</span>
+        <span>Vadodara</span>
+        <span>Surat</span>
+        <span>MMCT</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+    <!-- Left: Coach View -->
+    <div>
+      <div class="coach-panel">
+        <div class="panel-header">
+          <div class="panel-title">COACH MAP</div>
+          <div class="flex">
+            <div class="badge badge-cyan">A1 Active</div>
+          </div>
+        </div>
+
+        <div class="coach-tabs">
+          <button class="coach-tab active" onclick="selectCoach(this,'A1')">A1</button>
+          <button class="coach-tab" onclick="selectCoach(this,'A2')">A2</button>
+          <button class="coach-tab" onclick="selectCoach(this,'B1')">B1</button>
+          <button class="coach-tab" onclick="selectCoach(this,'B2')">B2</button>
+          <button class="coach-tab" onclick="selectCoach(this,'S1')">S1</button>
+          <button class="coach-tab" onclick="selectCoach(this,'S2')">S2</button>
+          <button class="coach-tab" onclick="selectCoach(this,'S3')">S3</button>
+        </div>
+
+        <div class="coach-body">
+          <div class="seat-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--confirmed)"></div>Confirmed</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--rac)"></div>RAC</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--vacant)"></div>No-Show</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--moving)"></div>Pending Swap</div>
+          </div>
+
+          <div class="seat-compartments" id="seat-grid">
+            <!-- dynamically generated -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom section tabs -->
+      <div class="sidebar-card" style="margin-top:24px;">
+        <div class="panel-header">
+          <div class="panel-title">GROUPS & FAMILIES</div>
+          <div class="badge badge-cyan">3 Split</div>
+        </div>
+        <div class="section-tabs">
+          <button class="section-tab active" onclick="switchTab(this,'families')">Family Groups</button>
+          <button class="section-tab" onclick="switchTab(this,'rac')">RAC Queue</button>
+          <button class="section-tab" onclick="switchTab(this,'activity')">Live Feed</button>
+        </div>
+
+        <div id="families-panel" class="family-groups">
+          <div class="family-group split">
+            <div class="family-header">
+              <div class="family-name">👨‍👩‍👧 Sharma Family · PNR 445521</div>
+              <div class="badge" style="background:rgba(255,107,53,0.15);color:var(--accent2);">SPLIT</div>
+            </div>
+            <div class="family-seats">
+              <span class="family-seat-tag seat-tag-diff">S1 · 24 UB</span>
+              <span class="family-seat-tag seat-tag-diff">S2 · 34 LB</span>
+              <span class="family-seat-tag seat-tag-diff">S3 · 12 MB</span>
+            </div>
+            <button class="merge-btn" onclick="openConsentModal('Sharma Family')">⟳ Request Seat Re-Cluster</button>
+          </div>
+
+          <div class="family-group split">
+            <div class="family-header">
+              <div class="family-name">👫 Gupta Couple · PNR 667834</div>
+              <div class="badge" style="background:rgba(255,107,53,0.15);color:var(--accent2);">SPLIT</div>
+            </div>
+            <div class="family-seats">
+              <span class="family-seat-tag seat-tag-diff">A1 · 4 LB</span>
+              <span class="family-seat-tag seat-tag-diff">A1 · 11 LB</span>
+            </div>
+            <button class="merge-btn" onclick="openConsentModal('Gupta Couple')">⟳ Request Seat Re-Cluster</button>
+          </div>
+
+          <div class="family-group together">
+            <div class="family-header">
+              <div class="family-name">👨‍👩‍👦‍👦 Mehta Family · PNR 889012</div>
+              <div class="badge badge-green">TOGETHER</div>
+            </div>
+            <div class="family-seats">
+              <span class="family-seat-tag seat-tag-same">A1 · 32 LB</span>
+              <span class="family-seat-tag seat-tag-same">A1 · 33 UB</span>
+              <span class="family-seat-tag seat-tag-same">A1 · 34 SU</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="rac-panel" class="rac-panel" style="display:none;">
+          <div class="rac-item">
+            <div class="rac-avatar">🧑</div>
+            <div class="rac-info">
+              <div class="rac-name">Priya Verma</div>
+              <div class="rac-detail">RAC 7 · NDLS → MMCT · Seat 41 SL</div>
+            </div>
+            <div class="upgrade-badge" onclick="upgradeRAC(this,'Priya Verma','41')">UPGRADE →</div>
+          </div>
+          <div class="rac-item">
+            <div class="rac-avatar">👴</div>
+            <div class="rac-info">
+              <div class="rac-name">Ramesh Nair</div>
+              <div class="rac-detail">RAC 12 · Kota → MMCT · Seat 17 SL</div>
+            </div>
+            <div class="upgrade-badge" onclick="upgradeRAC(this,'Ramesh Nair','17')">UPGRADE →</div>
+          </div>
+          <div class="rac-item">
+            <div class="rac-avatar">👩</div>
+            <div class="rac-info">
+              <div class="rac-name">Anita Desai</div>
+              <div class="rac-detail">RAC 3 · NDLS → Surat · Seat 8 SL</div>
+            </div>
+            <div class="upgrade-badge" onclick="upgradeRAC(this,'Anita Desai','8')">UPGRADE →</div>
+          </div>
+        </div>
+
+        <div id="activity-panel" style="display:none;">
+          <div class="activity-list" id="activity-feed">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="sidebar">
+      <!-- QR Scan -->
+      <div class="sidebar-card">
+        <div class="panel-header">
+          <div class="panel-title">SEAT VALIDATOR</div>
+        </div>
+        <div class="qr-panel">
+          <div class="qr-box">
+            <div class="scan-line"></div>
+            <div class="qr-inner">▦</div>
+          </div>
+          <div class="qr-title">Scan Seat QR</div>
+          <div class="qr-sub">Passenger must scan their assigned seat QR to confirm occupancy</div>
+          <button class="scan-btn" onclick="simulateScan()">▶ SIMULATE SCAN</button>
+
+          <div id="scan-result" style="display:none;margin-top:16px;background:var(--surface2);border:1px solid rgba(57,255,143,0.3);border-radius:10px;padding:14px;text-align:left;">
+            <div style="font-size:10px;letter-spacing:1px;color:var(--confirmed);font-family:'DM Mono',monospace;margin-bottom:8px;">✓ VALIDATED</div>
+            <div style="font-size:13px;font-weight:500;color:#fff;" id="scan-name">Rajesh Kumar</div>
+            <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;" id="scan-detail">PNR 334455 · A1 · Seat 24 LB · NDLS→MMCT</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Status -->
+      <div class="sidebar-card">
+        <div class="panel-header">
+          <div class="panel-title">SYSTEM STATUS</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:8px;">
+            <span style="font-size:12px;color:var(--muted);">PNR Server</span>
+            <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--confirmed);">● ONLINE</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:8px;">
+            <span style="font-size:12px;color:var(--muted);">QR Validation Engine</span>
+            <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--confirmed);">● ACTIVE</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:8px;">
+            <span style="font-size:12px;color:var(--muted);">Re-Cluster Algorithm</span>
+            <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--confirmed);">● RUNNING</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:8px;">
+            <span style="font-size:12px;color:var(--muted);">Consent Engine</span>
+            <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--warn);">● 6 PENDING</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:8px;">
+            <span style="font-size:12px;color:var(--muted);">Data Encryption</span>
+            <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--confirmed);">● AES-256</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Efficiency Meter -->
+      <div class="sidebar-card">
+        <div class="panel-header">
+          <div class="panel-title">OCCUPANCY EFFICIENCY</div>
+        </div>
+        <div style="padding:20px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:12px;color:var(--muted);">Effective Utilization</span>
+            <span style="font-size:16px;font-family:'Unbounded',sans-serif;font-weight:700;color:var(--accent);" id="eff-pct">96%</span>
+          </div>
+          <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px;">
+            <div id="eff-bar" style="height:100%;width:96%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:4px;transition:width 1s;"></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;">
+              <div style="font-family:'Unbounded',sans-serif;font-size:18px;font-weight:700;color:var(--confirmed);" id="e-total">354</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Total Seats</div>
+            </div>
+            <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;">
+              <div style="font-family:'Unbounded',sans-serif;font-size:18px;font-weight:700;color:var(--accent2);" id="e-wasted">14</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Wasted Seats</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Consent Modal -->
+<div class="modal-overlay" id="consent-modal">
+  <div class="modal">
+    <div class="modal-type">⚡ CONSENT REQUEST</div>
+    <div class="modal-title" id="modal-title">Seat Swap for Family Clustering</div>
+    <div class="modal-desc" id="modal-desc">The system has found compatible seats to bring the Sharma Family together. Passenger consent is required before any seat change takes place.</div>
+    <div class="passenger-cards">
+      <div class="pax-card">
+        <div class="pax-name" id="p1-name">Rahul Sharma</div>
+        <div class="pax-seat" id="p1-seat">A1 · Seat 24 UB → A1 · Seat 30 UB</div>
+      </div>
+      <div class="arrow-center">⇄</div>
+      <div class="pax-card">
+        <div class="pax-name" id="p2-name">Deepak Rao</div>
+        <div class="pax-seat" id="p2-seat">A1 · Seat 30 UB → A1 · Seat 24 UB</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-consent btn-decline" onclick="closeModal()">DECLINE</button>
+      <button class="btn-consent btn-accept" onclick="acceptSwap()">ACCEPT SWAP ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ========================
+// Data & State
+// ========================
+const seatData = [];
+const berths = ['LB','MB','UB','LB','MB','UB','SU','SL'];
+const statuses = ['confirmed','confirmed','confirmed','confirmed','confirmed','confirmed','vacant','rac','moving'];
+
+function init() {
+  // Generate seat data
+  for(let comp = 1; comp <= 9; comp++) {
+    for(let s = 0; s < 8; s++) {
+      const seatNum = (comp - 1) * 8 + s + 1;
+      const rnd = Math.random();
+      let status = 'confirmed';
+      if(rnd > 0.88) status = 'vacant';
+      else if(rnd > 0.80) status = 'rac';
+      else if(rnd > 0.75) status = 'moving';
+      seatData.push({ num: seatNum, berth: berths[s], status, comp });
+    }
+  }
+  renderSeats();
+  renderActivityFeed();
+  startLiveUpdates();
+}
+
+function renderSeats() {
+  const grid = document.getElementById('seat-grid');
+  grid.innerHTML = '';
+  const comps = {};
+  seatData.forEach(s => {
+    if(!comps[s.comp]) comps[s.comp] = [];
+    comps[s.comp].push(s);
+  });
+
+  Object.keys(comps).forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'compartment';
+    div.innerHTML = `<div class="comp-label">COMPARTMENT ${c}</div><div class="seat-row" id="comp-${c}"></div>`;
+    grid.appendChild(div);
+    const row = div.querySelector('.seat-row');
+    comps[c].forEach(seat => {
+      const el = document.createElement('div');
+      el.className = `seat ${seat.status}`;
+      el.id = `seat-${seat.num}`;
+      el.title = `Seat ${seat.num} ${seat.berth}`;
+      el.innerHTML = `<div class="seat-num">${seat.num}</div><div class="seat-berth">${seat.berth}</div>`;
+      el.onclick = () => selectSeat(seat, el);
+      row.appendChild(el);
+    });
+  });
+}
+
+function selectSeat(seat, el) {
+  document.querySelectorAll('.seat.selected').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+
+  if(seat.status === 'vacant') {
+    showToast('⚠️', 'No-Show Detected', `Seat ${seat.num} ${seat.berth} is unoccupied. Flagged for RAC upgrade.`, 'warn');
+  } else if(seat.status === 'rac') {
+    showToast('🎫', 'RAC Passenger', `Seat ${seat.num} is a RAC holder. Checking for upgrade availability...`, 'cyan');
+  } else if(seat.status === 'moving') {
+    showToast('🔄', 'Swap Pending', `Seat ${seat.num} awaiting passenger consent for relocation.`, 'cyan');
+  }
+}
+
+// ========================
+// Coach Tabs
+// ========================
+function selectCoach(el, name) {
+  document.querySelectorAll('.coach-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelector('.badge-cyan').textContent = name + ' Active';
+  // shuffle some statuses for visual change
+  seatData.forEach(s => {
+    const rnd = Math.random();
+    s.status = rnd > 0.88 ? 'vacant' : rnd > 0.80 ? 'rac' : rnd > 0.75 ? 'moving' : 'confirmed';
+  });
+  renderSeats();
+}
+
+// ========================
+// Section Tabs
+// ========================
+function switchTab(el, panel) {
+  document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['families','rac','activity'].forEach(p => {
+    document.getElementById(p+'-panel').style.display = p === panel ? '' : 'none';
+  });
+}
+
+// ========================
+// QR Scan Simulation
+// ========================
+const passengers = [
+  {name:'Rajesh Kumar', detail:'PNR 334455 · A1 · Seat 24 LB · NDLS→MMCT'},
+  {name:'Sunita Patel', detail:'PNR 887722 · B2 · Seat 7 UB · NDLS→MMCT'},
+  {name:'Arjun Singh', detail:'PNR 112233 · S1 · Seat 44 SL · NDLS→Surat'},
+  {name:'Kavita Rao', detail:'PNR 556677 · A1 · Seat 2 LB · Kota→MMCT'},
+];
+
+function simulateScan() {
+  const p = passengers[Math.floor(Math.random()*passengers.length)];
+  document.getElementById('scan-name').textContent = p.name;
+  document.getElementById('scan-detail').textContent = p.detail;
+  document.getElementById('scan-result').style.display = 'block';
+  showToast('✅', 'Scan Successful', `${p.name} validated at assigned seat.`, 'green');
+  addActivity('scan', `<strong>${p.name}</strong> scanned QR at assigned seat`, 'Just now');
+  updateStats(1, 0);
+}
+
+// ========================
+// Consent Modal
+// ========================
+let currentFamily = '';
+function openConsentModal(family) {
+  currentFamily = family;
+  document.getElementById('modal-title').textContent = `Seat Swap — ${family}`;
+  document.getElementById('consent-modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('consent-modal').classList.remove('active');
+}
+
+function acceptSwap() {
+  closeModal();
+  showToast('🔄', 'Swap Confirmed!', `${currentFamily} seats have been re-clustered successfully.`, 'green');
+  addActivity('swap', `<strong>${currentFamily}</strong> consented to seat re-cluster — family now together`, 'Just now');
+  // Update swap count
+  let cur = parseInt(document.getElementById('s-swaps').textContent);
+  if(cur > 0) document.getElementById('s-swaps').textContent = cur - 1;
+}
+
+// ========================
+// RAC Upgrade
+// ========================
+function upgradeRAC(btn, name, seat) {
+  btn.textContent = '✓ UPGRADED';
+  btn.style.background = 'rgba(57,255,143,0.2)';
+  btn.style.color = 'var(--confirmed)';
+  btn.style.borderColor = 'rgba(57,255,143,0.4)';
+  btn.onclick = null;
+  showToast('⬆️', 'RAC Upgraded!', `${name} moved from RAC to confirmed Seat ${seat}.`, 'green');
+  addActivity('upgrade', `<strong>${name}</strong> upgraded from RAC to confirmed Seat ${seat}`, 'Just now');
+  let cur = parseInt(document.getElementById('s-upgraded').textContent);
+  document.getElementById('s-upgraded').textContent = cur + 1;
+  let rac = parseInt(document.getElementById('s-rac').textContent);
+  document.getElementById('s-rac').textContent = Math.max(0, rac - 1);
+}
+
+// ========================
+// Activity Feed
+// ========================
+const activities = [
+  {type:'scan', icon:'✅', msg:'<strong>Meera Iyer</strong> validated at Seat 31 LB', time:'2m ago'},
+  {type:'upgrade', icon:'⬆️', msg:'<strong>Suresh Babu</strong> upgraded RAC → Seat 14 UB', time:'5m ago'},
+  {type:'swap', icon:'🔄', msg:'<strong>Jain Family</strong> re-clustered to compartment 4', time:'9m ago'},
+  {type:'vacant', icon:'⚠️', msg:'<strong>Seat 22 UB</strong> flagged as no-show after Mathura', time:'14m ago'},
+  {type:'scan', icon:'✅', msg:'<strong>Pradeep Nair</strong> validated at Seat 5 SL', time:'18m ago'},
+  {type:'upgrade', icon:'⬆️', msg:'<strong>Ritu Sharma</strong> upgraded RAC → Seat 38 LB', time:'22m ago'},
+];
+
+function renderActivityFeed() {
+  const feed = document.getElementById('activity-feed');
+  feed.innerHTML = '';
+  activities.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'activity-item';
+    div.innerHTML = `
+      <div class="activity-icon ${a.type}">${a.icon}</div>
+      <div>
+        <div class="activity-text">${a.msg}</div>
+        <div class="activity-time">${a.time}</div>
+      </div>`;
+    feed.appendChild(div);
+  });
+}
+
+function addActivity(type, msg, time) {
+  const icons = {scan:'✅', upgrade:'⬆️', swap:'🔄', vacant:'⚠️'};
+  activities.unshift({type, icon:icons[type], msg, time});
+  renderActivityFeed();
+}
+
+// ========================
+// Toast
+// ========================
+function showToast(icon, title, msg, color='cyan') {
+  const colors = {green:'var(--confirmed)', cyan:'var(--accent)', warn:'var(--warn)'};
+  const tc = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.borderColor = colors[color] || colors.cyan;
+  t.innerHTML = `
+    <div class="toast-icon">${icon}</div>
+    <div class="toast-text"><strong>${title}</strong>${msg}</div>`;
+  tc.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(()=>t.remove(),500); }, 3500);
+}
+
+// ========================
+// Stats Update
+// ========================
+function updateStats(scan, vacant) {
+  let c = parseInt(document.getElementById('s-confirmed').textContent);
+  document.getElementById('s-confirmed').textContent = c + scan;
+}
+
+// ========================
+// Live simulation
+// ========================
+function startLiveUpdates() {
+  setInterval(() => {
+    const rndSeat = seatData[Math.floor(Math.random()*seatData.length)];
+    if(rndSeat.status === 'vacant') {
+      rndSeat.status = 'rac';
+      const el = document.getElementById(`seat-${rndSeat.num}`);
+      if(el) { el.className = `seat rac`; }
+    }
+  }, 8000);
+
+  // Efficiency fluctuation
+  setInterval(() => {
+    const pct = 93 + Math.floor(Math.random()*5);
+    document.getElementById('eff-pct').textContent = pct + '%';
+    document.getElementById('eff-bar').style.width = pct + '%';
+  }, 5000);
+}
+
+// ========================
+// Boot
+// ========================
+document.addEventListener('DOMContentLoaded', init);
+window.onclick = (e) => {
+  if(e.target === document.getElementById('consent-modal')) closeModal();
+};
+</script>
+</body>
+</html>
