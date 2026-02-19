@@ -1,0 +1,163 @@
+
+[
+  {
+    "trainId": "12345",
+    "coach": "S1",
+    "seatNumber": "1",
+    "pnr": "PNR001",
+    "passengerName": "Rahul",
+    "boardingStation": "Chennai"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S1",
+    "seatNumber": "2",
+    "pnr": "PNR002",
+    "passengerName": "Anita",
+    "boardingStation": "Chennai"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S1",
+    "seatNumber": "3",
+    "pnr": "PNR003",
+    "passengerName": "Karthik",
+    "boardingStation": "Chennai"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S1",
+    "seatNumber": "4",
+    "pnr": "PNR004",
+    "passengerName": "Priya",
+    "boardingStation": "Chennai"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S2",
+    "seatNumber": "5",
+    "pnr": "PNR005",
+    "passengerName": "Arjun",
+    "boardingStation": "Vellore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S2",
+    "seatNumber": "6",
+    "pnr": "PNR006",
+    "passengerName": "Meena",
+    "boardingStation": "Vellore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S2",
+    "seatNumber": "7",
+    "pnr": "PNR007",
+    "passengerName": "Vijay",
+    "boardingStation": "Vellore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S2",
+    "seatNumber": "8",
+    "pnr": "PNR008",
+    "passengerName": "Sneha",
+    "boardingStation": "Vellore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S3",
+    "seatNumber": "9",
+    "pnr": "PNR009",
+    "passengerName": "Rohit",
+    "boardingStation": "Katpadi"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S3",
+    "seatNumber": "10",
+    "pnr": "PNR010",
+    "passengerName": "Divya",
+    "boardingStation": "Katpadi"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S3",
+    "seatNumber": "11",
+    "pnr": "PNR011",
+    "passengerName": "Harish",
+    "boardingStation": "Katpadi"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S3",
+    "seatNumber": "12",
+    "pnr": "PNR012",
+    "passengerName": "Nisha",
+    "boardingStation": "Katpadi"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S4",
+    "seatNumber": "13",
+    "pnr": "PNR013",
+    "passengerName": "Sanjay",
+    "boardingStation": "Bangalore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S4",
+    "seatNumber": "14",
+    "pnr": "PNR014",
+    "passengerName": "Lakshmi",
+    "boardingStation": "Bangalore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S4",
+    "seatNumber": "15",
+    "pnr": "PNR015",
+    "passengerName": "Manoj",
+    "boardingStation": "Bangalore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S4",
+    "seatNumber": "16",
+    "pnr": "PNR016",
+    "passengerName": "Aishwarya",
+    "boardingStation": "Bangalore"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S5",
+    "seatNumber": "17",
+    "pnr": "PNR017",
+    "passengerName": "Kiran",
+    "boardingStation": "Salem"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S5",
+    "seatNumber": "18",
+    "pnr": "PNR018",
+    "passengerName": "Deepa",
+    "boardingStation": "Salem"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S5",
+    "seatNumber": "19",
+    "pnr": "PNR019",
+    "passengerName": "Ramesh",
+    "boardingStation": "Salem"
+  },
+  {
+    "trainId": "12345",
+    "coach": "S5",
+    "seatNumber": "20",
+    "pnr": "PNR020",
+    "passengerName": "Pooja",
+    "boardingStation": "Salem"
+  }
+]
