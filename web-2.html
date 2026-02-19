@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RailSmart — Fleet Control</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Unbounded:wght@300;400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#151e2e;--border:#1e2d45;--accent:#00e5ff;--accent2:#ff6b35;--accent3:#39ff8f;--warn:#ffcc00;--text:#c8d8f0;--muted:#4a6080;--confirmed:#39ff8f;--rac:#ffcc00;--vacant:#ff4d6d;--moving:#00e5ff;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(8,12,18,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Unbounded',sans-serif;font-weight:900;font-size:17px;color:#fff;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;}
+.logo-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);font-weight:400;margin-left:2px;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,.4);}50%{box-shadow:0 0 0 6px rgba(0,229,255,0);}}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.live-badge{display:flex;align-items:center;gap:6px;background:rgba(57,255,143,.1);border:1px solid rgba(57,255,143,.3);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--confirmed);font-family:'DM Mono',monospace;letter-spacing:1px;}
+.live-badge::before{content:'';width:6px;height:6px;background:var(--confirmed);border-radius:50%;animation:pulse 1.5s infinite;}
+.gclock{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);}
+.gclock span{color:var(--accent);}
+
+/* PAGES */
+.page{display:none;position:relative;z-index:1;}
+.page.active{display:block;}
+
+/* ===== FLEET PAGE ===== */
+.fleet-top{padding:28px 32px 0;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
+.fleet-title{font-family:'Unbounded',sans-serif;font-size:clamp(20px,3.5vw,36px);font-weight:700;color:#fff;line-height:1.1;}
+.fleet-title em{font-style:normal;color:var(--accent);}
+.fleet-sub{color:var(--muted);font-size:13px;margin-top:5px;}
+.fleet-meta{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);text-align:right;}
+.fleet-meta strong{color:var(--accent);font-size:22px;font-family:'Unbounded',sans-serif;display:block;}
+
+.fleet-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 32px;}
+.fsc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;}
+.fsc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.fsc.c1::after{background:var(--accent);}
+.fsc.c2::after{background:var(--confirmed);}
+.fsc.c3::after{background:var(--rac);}
+.fsc.c4::after{background:var(--vacant);}
+.fsc-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-family:'DM Mono',monospace;}
+.fsc-val{font-family:'Unbounded',sans-serif;font-size:26px;font-weight:700;color:#fff;line-height:1;}
+.fsc-sub{font-size:10px;color:var(--muted);margin-top:3px;}
+
+.fleet-controls{padding:0 32px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.search-wrap{flex:1;min-width:200px;position:relative;}
+.search-wrap input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px 9px 34px;color:#fff;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s;}
+.search-wrap input:focus{border-color:var(--accent);}
+.search-wrap::before{content:'⌕';position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;}
+.fbtn{padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.fbtn.on,.fbtn:hover{border-color:var(--accent);color:var(--accent);}
+.fsel{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:11px;font-family:'DM Mono',monospace;outline:none;cursor:pointer;}
+
+.trains-grid{padding:0 32px 32px;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;}
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;cursor:pointer;transition:all .25s;position:relative;}
+.tcard:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,229,255,.08);}
+.tcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;transition:opacity .25s;}
+.tcard.running::before{background:linear-gradient(90deg,var(--accent),var(--accent3));}
+.tcard.delayed::before{background:linear-gradient(90deg,var(--warn),var(--accent2));}
+.tcard.arrived::before{background:var(--border);}
+.tc-head{padding:16px 16px 12px;border-bottom:1px solid var(--border);}
+.tc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.tc-num{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:900;color:#fff;}
+.tc-name{font-size:10px;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace;}
+.tc-pill{display:flex;align-items:center;gap:5px;font-size:9px;font-family:'DM Mono',monospace;padding:3px 9px;border-radius:20px;letter-spacing:.5px;}
+.tc-pill::before{content:'';width:5px;height:5px;border-radius:50%;}
+.tc-pill.running{background:rgba(57,255,143,.1);color:var(--confirmed);border:1px solid rgba(57,255,143,.3);}
+.tc-pill.running::before{background:var(--confirmed);animation:pulse 1.5s infinite;}
+.tc-pill.delayed{background:rgba(255,204,0,.1);color:var(--warn);border:1px solid rgba(255,204,0,.3);}
+.tc-pill.delayed::before{background:var(--warn);}
+.tc-pill.arrived{background:rgba(74,96,128,.1);color:var(--muted);border:1px solid rgba(74,96,128,.3);}
+.tc-pill.arrived::before{background:var(--muted);}
+.tc-route{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:12px;}
+.tc-orig,.tc-dest{font-weight:700;color:#fff;}
+.tc-line{flex:1;height:1px;background:var(--border);position:relative;}
+.tc-line::after{content:'→';position:absolute;left:50%;transform:translateX(-50%) translateY(-50%);background:var(--surface);padding:0 4px;color:var(--accent);font-size:10px;}
+.tc-times{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:5px;}
+.tc-times .curr{color:var(--warn);}
+.tc-body{padding:12px 16px;}
+.tc-progress{margin-bottom:10px;}
+.tc-pbar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.tc-pfill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent3));}
+.tc-plabels{display:flex;justify-content:space-between;font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);margin-top:3px;}
+.tc-plabels .mid{color:var(--warn);}
+.tc-minibars{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
+.mbar{text-align:center;}
+.mbar-track{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:3px;}
+.mbar-fill{height:100%;border-radius:2px;}
+.mbar-val{font-size:10px;font-weight:700;line-height:1;}
+.mbar-label{font-size:8px;color:var(--muted);font-family:'DM Mono',monospace;}
+.tc-foot{display:flex;justify-content:space-between;align-items:center;}
+.tc-info{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
+.tc-info span{color:var(--accent);}
+.manage-btn{padding:6px 14px;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);border-radius:6px;color:var(--accent);font-size:10px;font-family:'Unbounded',sans-serif;font-weight:700;cursor:pointer;transition:all .2s;}
+.manage-btn:hover{background:var(--accent);color:#000;}
+
+/* ===== DETAIL PAGE ===== */
+.det-topbar{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;background:var(--surface);flex-wrap:wrap;gap:12px;}
+.back-btn{padding:7px 14px;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;transition:all .2s;background:transparent;white-space:nowrap;}
+.back-btn:hover{border-color:var(--accent);color:var(--accent);}
+.det-name{font-family:'Unbounded',sans-serif;font-size:15px;font-weight:900;color:#fff;}
+.det-route{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.det-pill{margin-left:auto;padding:5px 12px;border-radius:20px;font-size:10px;font-family:'DM Mono',monospace;}
+
+.coach-ribbon{background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 28px 0;display:flex;gap:3px;overflow-x:auto;}
+.cpill{padding:7px 16px;border-radius:7px 7px 0 0;font-size:10px;font-family:'DM Mono',monospace;cursor:pointer;border:1px solid var(--border);border-bottom:none;color:var(--muted);background:transparent;transition:all .2s;white-space:nowrap;}
+.cpill.on{background:var(--bg);color:var(--accent);}
+.cpill:hover:not(.on){color:var(--text);}
+
+.sstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);}
+.ss-item{background:var(--surface2);padding:12px 14px;}
+.ss-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:5px;}
+.ss-val{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:700;color:#fff;}
+
+.det-body{padding:20px 28px;display:grid;grid-template-columns:1fr 340px;gap:20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.phead{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.ptitle{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;color:#fff;letter-spacing:.5px;}
+.badge{padding:3px 8px;border-radius:4px;font-size:9px;font-family:'DM Mono',monospace;font-weight:500;}
+.bg{background:rgba(57,255,143,.12);color:var(--confirmed);}
+.bc{background:rgba(0,229,255,.12);color:var(--moving);}
+.bw{background:rgba(255,204,0,.12);color:var(--warn);}
+.br{background:rgba(255,77,109,.12);color:var(--vacant);}
+
+/* Journey */
+.jbar-wrap{padding:14px 18px;}
+.jtrack{height:4px;background:var(--border);border-radius:2px;margin:12px 0;position:relative;}
+.jfill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent3));}
+.jdot{position:absolute;width:12px;height:12px;background:var(--accent);border-radius:50%;border:2px solid var(--bg);top:50%;transform:translate(-50%,-50%);}
+.jstations{display:flex;justify-content:space-between;font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);}
+.jstations .curr{color:var(--warn);}
+.jstations .done{opacity:.4;}
+
+/* Seats */
+.seat-legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.leg{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;}
+.leg-dot{width:8px;height:8px;border-radius:3px;}
+.comps{display:flex;flex-direction:column;gap:12px;}
+.comp{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;}
+.comp-lbl{font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);letter-spacing:1px;margin-bottom:9px;}
+.srow{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;}
+.seat{aspect-ratio:1;border-radius:5px;border:1px solid;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:7px;font-family:'DM Mono',monospace;transition:all .2s;min-height:40px;}
+.seat:hover{transform:scale(1.12);z-index:10;}
+.seat.confirmed{background:rgba(57,255,143,.07);border-color:rgba(57,255,143,.3);color:var(--confirmed);}
+.seat.vacant{background:rgba(255,77,109,.07);border-color:rgba(255,77,109,.3);color:var(--vacant);}
+.seat.rac{background:rgba(255,204,0,.07);border-color:rgba(255,204,0,.3);color:var(--rac);}
+.seat.moving{background:rgba(0,229,255,.07);border-color:rgba(0,229,255,.4);color:var(--moving);animation:sp 2s infinite;}
+.seat.sel{transform:scale(1.14);box-shadow:0 0 16px rgba(0,229,255,.5);border-color:var(--accent)!important;z-index:20;}
+@keyframes sp{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,.3);}50%{box-shadow:0 0 0 4px rgba(0,229,255,0);}}
+.snum{font-weight:500;font-size:8px;line-height:1;}
+.sberth{font-size:7px;opacity:.7;margin-top:1px;}
+
+/* Sidebar */
+.sidebar{display:flex;flex-direction:column;gap:14px;}
+.qr-box{width:110px;height:110px;margin:0 auto 12px;border:2px solid var(--accent);border-radius:11px;display:flex;align-items:center;justify-content:center;position:relative;background:rgba(0,229,255,.03);animation:qrg 3s infinite;}
+@keyframes qrg{0%,100%{box-shadow:0 0 20px rgba(0,229,255,.18);}50%{box-shadow:0 0 36px rgba(0,229,255,.38);}}
+.qr-box::before{content:'';position:absolute;top:-2px;left:-2px;width:16px;height:16px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:4px 0 0 0;}
+.qr-box::after{content:'';position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 0 4px 0;}
+.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scan 2s infinite;top:0;}
+@keyframes scan{0%{top:0;opacity:1;}100%{top:100%;opacity:.3;}}
+.qr-inner{font-size:40px;opacity:.6;}
+.scan-btn{width:100%;padding:10px;background:var(--accent);color:#000;border:none;border-radius:7px;font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:all .2s;}
+.scan-btn:hover{background:#fff;transform:translateY(-1px);}
+
+.acts{max-height:240px;overflow-y:auto;padding:0 14px 14px;}
+.acts::-webkit-scrollbar{width:3px;}
+.acts::-webkit-scrollbar-thumb{background:var(--border);}
+.aitem{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid rgba(30,45,69,.4);animation:ain .4s ease;}
+@keyframes ain{from{opacity:0;transform:translateX(-7px);}to{opacity:1;transform:translateX(0);}}
+.aico{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.aico.scan{background:rgba(57,255,143,.15);}
+.aico.upgrade{background:rgba(0,229,255,.15);}
+.aico.swap{background:rgba(255,107,53,.15);}
+.aico.vacant{background:rgba(255,77,109,.15);}
+.atxt{font-size:11px;line-height:1.45;color:var(--text);}
+.atxt strong{color:#fff;font-weight:500;}
+.atime{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;}
+
+.rac-items{padding:0 14px 14px;display:flex;flex-direction:column;gap:7px;}
+.ritem{display:flex;align-items:center;gap:9px;padding:9px;background:var(--surface2);border:1px solid rgba(255,204,0,.2);border-radius:7px;transition:all .2s;}
+.ritem:hover{border-color:rgba(255,204,0,.4);}
+.rav{width:30px;height:30px;background:rgba(255,204,0,.12);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.rinfo{flex:1;}
+.rname{font-size:12px;font-weight:500;color:#fff;}
+.rdet{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;}
+.upbadge{padding:3px 8px;background:rgba(57,255,143,.1);border:1px solid rgba(57,255,143,.3);border-radius:12px;font-size:9px;font-family:'DM Mono',monospace;color:var(--confirmed);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.upbadge:hover{background:rgba(57,255,143,.22);}
+
+.fam-items{padding:0 14px 14px;display:flex;flex-direction:column;gap:7px;}
+.fitem{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;transition:all .2s;}
+.fitem.split{border-color:rgba(255,107,53,.4);}
+.fitem.together{border-color:rgba(57,255,143,.3);}
+.fitem:hover{transform:translateX(2px);}
+.fhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.fname{font-size:12px;font-weight:500;color:#fff;}
+.fseats{display:flex;gap:4px;flex-wrap:wrap;}
+.ftag{padding:2px 6px;border-radius:3px;font-size:9px;font-family:'DM Mono',monospace;}
+.ftag.diff{background:rgba(255,107,53,.14);color:var(--accent2);}
+.ftag.same{background:rgba(57,255,143,.1);color:var(--confirmed);}
+.fbtn2{width:100%;margin-top:7px;padding:6px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);border-radius:5px;color:var(--accent2);font-size:9px;font-family:'Unbounded',sans-serif;font-weight:700;cursor:pointer;transition:all .2s;}
+.fbtn2:hover{background:rgba(255,107,53,.22);}
+
+.sys-rows{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
+.srow2{display:flex;justify-content:space-between;align-items:center;padding:7px 9px;background:var(--surface2);border-radius:6px;}
+.slbl{font-size:11px;color:var(--muted);}
+.sval{font-size:9px;font-family:'DM Mono',monospace;}
+
+.stabs{display:flex;gap:2px;padding:4px;background:var(--surface2);border-radius:7px;margin:12px 14px;}
+.stab{flex:1;padding:5px;border-radius:5px;text-align:center;font-size:9px;font-family:'DM Mono',monospace;cursor:pointer;color:var(--muted);transition:all .2s;border:none;background:transparent;}
+.stab.on{background:var(--surface);color:var(--accent);border:1px solid var(--border);}
+
+.eff-wrap{padding:14px 18px;}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(8,12,18,.9);backdrop-filter:blur(10px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}
+.modal-overlay.on{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px;width:390px;max-width:90vw;transform:scale(.95);transition:transform .3s;position:relative;overflow:hidden;}
+.modal-overlay.on .modal{transform:scale(1);}
+.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent3));}
+.mtype{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-family:'DM Mono',monospace;margin-bottom:11px;}
+.mtitle{font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.2;}
+.mdesc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:18px;}
+.pax-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:18px;}
+.pcard{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;}
+.pname{font-size:12px;font-weight:500;color:#fff;margin-bottom:3px;}
+.pseat{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);}
+.parrow{font-size:17px;color:var(--accent);text-align:center;}
+.mactions{display:flex;gap:9px;}
+.mbtn{flex:1;padding:10px;border-radius:7px;font-family:'Unbounded',sans-serif;font-size:10px;font-weight:700;cursor:pointer;transition:all .2s;border:none;letter-spacing:.5px;}
+.mbtn-accept{background:var(--accent3);color:#000;}
+.mbtn-accept:hover{background:#fff;}
+.mbtn-decline{background:transparent;border:1px solid var(--border)!important;color:var(--muted);border:none;}
+.mbtn-decline:hover{color:var(--vacant);}
+
+/* Toast */
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:600;display:flex;flex-direction:column;gap:7px;}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 14px;min-width:250px;display:flex;align-items:center;gap:9px;animation:tin .4s ease;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+@keyframes tin{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+.ticon{font-size:17px;}
+.ttxt{font-size:11px;line-height:1.35;}
+.ttxt strong{display:block;color:#fff;margin-bottom:1px;font-size:12px;}
+
+/* Responsive */
+@media(max-width:900px){.det-body{grid-template-columns:1fr;}.fleet-stats{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.fleet-top,.fleet-stats,.fleet-controls,.trains-grid{padding-left:14px;padding-right:14px;}.det-body,.det-topbar,.coach-ribbon{padding-left:14px;padding-right:14px;}.sstrip{grid-template-columns:repeat(3,1fr);}}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo" onclick="goFleet()">
+    <div class="logo-dot"></div>
+    RailSmart
+    <span class="logo-sub">FLEET</span>
+  </div>
+  <div class="topbar-right">
+    <div class="gclock">IST <span id="gclock">--:--:--</span></div>
+    <div class="live-badge">LIVE</div>
+  </div>
+</div>
+
+<!-- ======== FLEET PAGE ======== -->
+<div class="page active" id="fleet-page">
+  <div class="fleet-top">
+    <div>
+      <div class="fleet-title">Fleet <em>Control</em></div>
+      <div class="fleet-sub">Real-time seat management across all active trains</div>
+    </div>
+    <div class="fleet-meta"><strong id="active-count">—</strong>trains running now</div>
+  </div>
+
+  <div class="fleet-stats">
+    <div class="fsc c1"><div class="fsc-label">Total Seats</div><div class="fsc-val" id="gs-total">—</div><div class="fsc-sub">All coaches</div></div>
+    <div class="fsc c2"><div class="fsc-label">Confirmed</div><div class="fsc-val" id="gs-conf">—</div><div class="fsc-sub">Validated</div></div>
+    <div class="fsc c3"><div class="fsc-label">RAC</div><div class="fsc-val" id="gs-rac">—</div><div class="fsc-sub">Awaiting upgrade</div></div>
+    <div class="fsc c4"><div class="fsc-label">No-Shows</div><div class="fsc-val" id="gs-vac">—</div><div class="fsc-sub">Flagged seats</div></div>
+  </div>
+
+  <div class="fleet-controls">
+    <div class="search-wrap"><input type="text" id="srch" placeholder="Search train number, name or station…" oninput="renderFleet()"></div>
+    <button class="fbtn on" onclick="setF('all',this)">All</button>
+    <button class="fbtn" onclick="setF('running',this)">Running</button>
+    <button class="fbtn" onclick="setF('delayed',this)">Delayed</button>
+    <button class="fbtn" onclick="setF('arrived',this)">Arrived</button>
+    <select class="fsel" onchange="curSort=this.value;renderFleet()">
+      <option value="num">Sort: Train No.</option>
+      <option value="eff">Sort: Efficiency</option>
+      <option value="rac">Sort: RAC Count</option>
+      <option value="name">Sort: Name</option>
+    </select>
+  </div>
+
+  <div class="trains-grid" id="trains-grid"></div>
+</div>
+
+<!-- ======== DETAIL PAGE ======== -->
+<div class="page" id="detail-page">
+  <div class="det-topbar">
+    <button class="back-btn" onclick="goFleet()">← Fleet</button>
+    <div>
+      <div class="det-name" id="d-name">—</div>
+      <div class="det-route" id="d-route">—</div>
+    </div>
+    <div class="det-pill badge" id="d-pill"></div>
+  </div>
+
+  <div class="coach-ribbon" id="coach-ribbon"></div>
+
+  <div style="background:var(--bg);padding:14px 28px 0;">
+    <div class="sstrip">
+      <div class="ss-item"><div class="ss-label">Confirmed</div><div class="ss-val" id="ds-c" style="color:var(--confirmed)">—</div></div>
+      <div class="ss-item"><div class="ss-label">RAC</div><div class="ss-val" id="ds-r" style="color:var(--rac)">—</div></div>
+      <div class="ss-item"><div class="ss-label">No-Show</div><div class="ss-val" id="ds-v" style="color:var(--vacant)">—</div></div>
+      <div class="ss-item"><div class="ss-label">Swaps</div><div class="ss-val" id="ds-s" style="color:var(--moving)">—</div></div>
+      <div class="ss-item"><div class="ss-label">Upgraded</div><div class="ss-val" id="ds-u" style="color:var(--accent2)">—</div></div>
+    </div>
+  </div>
+
+  <div class="det-body">
+    <!-- LEFT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <!-- Journey -->
+      <div class="panel">
+        <div class="phead"><div class="ptitle">JOURNEY PROGRESS</div><div id="d-eta" style="font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);"></div></div>
+        <div class="jbar-wrap">
+          <div class="jtrack"><div class="jfill" id="jfill" style="width:0%"></div></div>
+          <div class="jstations" id="jstations"></div>
+        </div>
+      </div>
+
+      <!-- Seat Map -->
+      <div class="panel">
+        <div class="phead"><div class="ptitle">COACH MAP</div><div class="badge bc" id="coach-lbl">—</div></div>
+        <div style="padding:14px 18px 0;">
+          <div class="seat-legend">
+            <div class="leg"><div class="leg-dot" style="background:var(--confirmed)"></div>Confirmed</div>
+            <div class="leg"><div class="leg-dot" style="background:var(--rac)"></div>RAC</div>
+            <div class="leg"><div class="leg-dot" style="background:var(--vacant)"></div>No-Show</div>
+            <div class="leg"><div class="leg-dot" style="background:var(--moving)"></div>Swap Pending</div>
+          </div>
+          <div class="comps" id="seat-grid"></div>
+        </div>
+        <div style="height:16px;"></div>
+      </div>
+
+      <!-- Families / RAC / Feed -->
+      <div class="panel">
+        <div class="phead"><div class="ptitle">GROUPS & FAMILIES</div><div class="badge bw" id="split-badge">— Split</div></div>
+        <div class="stabs">
+          <button class="stab on" onclick="dtab(this,'fam')">Families</button>
+          <button class="stab" onclick="dtab(this,'racq')">RAC Queue</button>
+          <button class="stab" onclick="dtab(this,'feed')">Live Feed</button>
+        </div>
+        <div id="fam-panel" class="fam-items"></div>
+        <div id="racq-panel" class="rac-items" style="display:none;"></div>
+        <div id="feed-panel" class="acts" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <!-- QR Validator -->
+      <div class="panel">
+        <div class="phead"><div class="ptitle">SEAT VALIDATOR</div></div>
+        <div style="padding:18px;text-align:center;">
+          <div class="qr-box"><div class="scan-line"></div><div class="qr-inner">▦</div></div>
+          <div style="font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;color:#fff;margin-bottom:3px;">Scan Seat QR</div>
+          <div style="font-size:11px;color:var(--muted);">Passenger must scan assigned seat to validate occupancy</div>
+          <button class="scan-btn" style="margin-top:12px;" onclick="simulateScan()">▶ SIMULATE SCAN</button>
+          <div id="scan-result" style="display:none;margin-top:12px;background:var(--surface2);border:1px solid rgba(57,255,143,.3);border-radius:9px;padding:11px;text-align:left;">
+            <div style="font-size:9px;letter-spacing:1px;color:var(--confirmed);font-family:'DM Mono',monospace;margin-bottom:5px;">✓ VALIDATED</div>
+            <div style="font-size:12px;font-weight:500;color:#fff;" id="scan-name">—</div>
+            <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;" id="scan-det">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Efficiency -->
+      <div class="panel">
+        <div class="phead"><div class="ptitle">OCCUPANCY EFFICIENCY</div></div>
+        <div class="eff-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:11px;color:var(--muted);">Utilization</span>
+            <span style="font-size:14px;font-family:'Unbounded',sans-serif;font-weight:700;color:var(--accent);" id="eff-pct">—</span>
+          </div>
+          <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:12px;">
+            <div id="eff-bar" style="height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent3));transition:width 1s;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+            <div style="padding:9px;background:var(--surface2);border-radius:7px;text-align:center;">
+              <div style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--confirmed);" id="e-tot">—</div>
+              <div style="font-size:9px;color:var(--muted);margin-top:2px;">Total Seats</div>
+            </div>
+            <div style="padding:9px;background:var(--surface2);border-radius:7px;text-align:center;">
+              <div style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--accent2);" id="e-wst">—</div>
+              <div style="font-size:9px;color:var(--muted);margin-top:2px;">Wasted Seats</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Status -->
+      <div class="panel">
+        <div class="phead"><div class="ptitle">SYSTEM STATUS</div></div>
+        <div class="sys-rows">
+          <div class="srow2"><span class="slbl">PNR Server</span><span class="sval" style="color:var(--confirmed)">● ONLINE</span></div>
+          <div class="srow2"><span class="slbl">QR Validation</span><span class="sval" style="color:var(--confirmed)">● ACTIVE</span></div>
+          <div class="srow2"><span class="slbl">Re-Cluster Engine</span><span class="sval" style="color:var(--confirmed)">● RUNNING</span></div>
+          <div class="srow2"><span class="slbl">Consent Engine</span><span class="sval" id="consent-stat" style="color:var(--warn)">● — PENDING</span></div>
+          <div class="srow2"><span class="slbl">Encryption</span><span class="sval" style="color:var(--confirmed)">● AES-256</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Consent Modal -->
+<div class="modal-overlay" id="cmodal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="mtype">⚡ CONSENT REQUEST</div>
+    <div class="mtitle" id="mtitle">Seat Swap for Family Clustering</div>
+    <div class="mdesc" id="mdesc">The system found compatible seats. Both passengers must consent before any change.</div>
+    <div class="pax-pair">
+      <div class="pcard"><div class="pname" id="p1n">—</div><div class="pseat" id="p1s">—</div></div>
+      <div class="parrow">⇄</div>
+      <div class="pcard"><div class="pname" id="p2n">—</div><div class="pseat" id="p2s">—</div></div>
+    </div>
+    <div class="mactions">
+      <button class="mbtn mbtn-decline" onclick="closeModal()">DECLINE</button>
+      <button class="mbtn mbtn-accept" onclick="acceptSwap()">ACCEPT SWAP ✓</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// ============ DATA ============
+const TRAINS=[
+  {id:'t1',num:'12951',name:'Mumbai Rajdhani',from:'NDLS',to:'MMCT',dep:'16:55',arr:'08:35+1',status:'running',progress:38,coaches:['A1','A2','B1','B2','S1','S2','S3','PC1'],stations:['NDLS','Mathura','Kota','Vadodara','Surat','MMCT'],currSt:2,delay:0,type:'Rajdhani'},
+  {id:'t2',num:'12002',name:'Shatabdi Express',from:'NDLS',to:'BPL',dep:'06:00',arr:'13:55',status:'running',progress:72,coaches:['CC1','CC2','CC3','EC1'],stations:['NDLS','AGC','GWL','JHS','BPL'],currSt:3,delay:0,type:'Shatabdi'},
+  {id:'t3',num:'12302',name:'Howrah Rajdhani',from:'NDLS',to:'HWH',dep:'17:00',arr:'09:55+1',status:'running',progress:22,coaches:['A1','A2','B1','B2','B3','S1','S2'],stations:['NDLS','CNB','MGS','DHN','HWH'],currSt:1,delay:0,type:'Rajdhani'},
+  {id:'t4',num:'12627',name:'Karnataka Express',from:'NDLS',to:'SBC',dep:'22:30',arr:'06:30+2',status:'delayed',progress:15,coaches:['A1','B1','B2','S1','S2','S3','S4'],stations:['NDLS','AGC','JHS','NGP','SC','SBC'],currSt:1,delay:45,type:'Express'},
+  {id:'t5',num:'12431',name:'Trivandrum Raj.',from:'NDLS',to:'TVC',dep:'11:00',arr:'10:00+2',status:'running',progress:55,coaches:['A1','A2','B1','B2','S1','S2'],stations:['NDLS','MTJ','GWL','BPL','NGP','TVC'],currSt:3,delay:0,type:'Rajdhani'},
+  {id:'t6',num:'12013',name:'Amritsar Shatabdi',from:'NDLS',to:'ASR',dep:'07:20',arr:'13:15',status:'arrived',progress:100,coaches:['CC1','CC2','EC1'],stations:['NDLS','AMB','LDH','ASR'],currSt:3,delay:0,type:'Shatabdi'},
+  {id:'t7',num:'12953',name:'August Kranti Raj.',from:'MMCT',to:'NDLS',dep:'17:40',arr:'10:55+1',status:'delayed',progress:40,coaches:['A1','B1','B2','S1','S2','S3'],stations:['MMCT','ST','Kota','MTJ','NDLS'],currSt:2,delay:28,type:'Rajdhani'},
+  {id:'t8',num:'12034',name:'Jammu Shatabdi',from:'NDLS',to:'JAT',dep:'07:45',arr:'14:00',status:'running',progress:88,coaches:['CC1','CC2','CC3','EC1'],stations:['NDLS','PTK','UMB','JAT'],currSt:3,delay:0,type:'Shatabdi'},
+  {id:'t9',num:'12259',name:'Duronto Express',from:'HWH',to:'NDLS',dep:'08:15',arr:'05:00+1',status:'running',progress:61,coaches:['A1','B1','B2','B3','S1','S2','S3','S4'],stations:['HWH','ASN','MGS','CNB','NDLS'],currSt:3,delay:0,type:'Duronto'},
+  {id:'t10',num:'12956',name:'JP-MMCT SF Exp',from:'JP',to:'MMCT',dep:'05:50',arr:'23:00',status:'delayed',progress:50,coaches:['A1','B1','B2','S1','S2','S3'],stations:['JP','AII','RTM','ST','MMCT'],currSt:2,delay:15,type:'SuperFast'},
+];
+
+const BERTHS=['LB','MB','UB','LB','MB','UB','SU','SL'];
+const PNAMES=['Rahul Kumar','Sunita Patel','Arjun Singh','Kavita Rao','Priya Verma','Ramesh Nair','Anita Desai','Suresh Babu','Mohit Gupta','Deepa K.'];
+const ROUTES=['NDLS→MMCT','NDLS→BPL','NDLS→HWH','NDLS→SBC','NDLS→TVC'];
+
+function mkSeats(n=8){
+  const comps=[];
+  for(let c=1;c<=n;c++){
+    const seats=[];
+    for(let s=0;s<8;s++){
+      const r=Math.random();
+      let st='confirmed';
+      if(r>.88) st='vacant'; else if(r>.78) st='rac'; else if(r>.72) st='moving';
+      seats.push({num:(c-1)*8+s+1,berth:BERTHS[s],status:st});
+    }
+    comps.push(seats);
+  }
+  return comps;
+}
+
+function mkActs(){
+  const T=[
+    {t:'scan',i:'✅',m:['<strong>%N</strong> validated at Seat %S LB','<strong>%N</strong> scanned QR at Seat %S UB']},
+    {t:'upgrade',i:'⬆️',m:['<strong>%N</strong> upgraded RAC → Seat %S LB','<strong>%N</strong> moved to confirmed Seat %S']},
+    {t:'swap',i:'🔄',m:['<strong>%N Family</strong> consented to seat re-cluster','Seats re-clustered in compartment %S']},
+    {t:'vacant',i:'⚠️',m:['<strong>Seat %S UB</strong> flagged no-show','<strong>Seat %S MB</strong> unoccupied — RAC eligible']},
+  ];
+  const times=['Just now','2m ago','5m ago','9m ago','14m ago','20m ago','27m ago'];
+  return Array.from({length:7},(_,i)=>{
+    const tp=T[Math.floor(Math.random()*T.length)];
+    const msg=tp.m[Math.floor(Math.random()*tp.m.length)]
+      .replace('%N',PNAMES[Math.floor(Math.random()*PNAMES.length)])
+      .replace('%S',Math.floor(Math.random()*60)+1);
+    return {t:tp.t,i:tp.i,msg,time:times[i]};
+  });
+}
+
+function mkRAC(n){
+  return Array.from({length:Math.min(4,n)},(_,i)=>({
+    name:PNAMES[i%PNAMES.length],
+    det:`RAC ${i+1} · ${ROUTES[i%ROUTES.length]} · Seat ${Math.floor(Math.random()*60)+1} SL`,
+    done:false
+  }));
+}
+
+const FAM_POOL=[
+  {name:'👨‍👩‍👧 Sharma Family',pnr:'445521',split:true,seats:['S1·24 UB','S2·34 LB','S3·12 MB']},
+  {name:'👫 Gupta Couple',pnr:'667834',split:true,seats:['A1·4 LB','A1·11 LB']},
+  {name:'👨‍👩‍👦‍👦 Mehta Family',pnr:'889012',split:false,seats:['A1·32 LB','A1·33 UB','A1·34 SU']},
+  {name:'👵 Reddy Group',pnr:'112244',split:true,seats:['B1·7 LB','B2·19 UB']},
+  {name:'👨‍👧 Iyer Duo',pnr:'334411',split:false,seats:['S2·5 LB','S2·6 UB']},
+];
+
+// Build train data
+const TD={};
+TRAINS.forEach(t=>{
+  const total=t.coaches.length*72;
+  const vac=Math.floor(Math.random()*18)+5;
+  const rac=Math.floor(Math.random()*30)+10;
+  const sw=Math.floor(Math.random()*8)+2;
+  const upg=Math.floor(Math.random()*12)+3;
+  const conf=total-vac-rac;
+  TD[t.id]={
+    total,conf,rac,vac,sw,upg,
+    eff:Math.round(conf/(total-vac)*100),
+    seats:mkSeats(Math.min(t.coaches.length,8)),
+    acts:mkActs(),
+    racQ:mkRAC(rac),
+    fams:FAM_POOL.slice(0,2+Math.floor(Math.random()*3)).map(f=>({...f,seats:[...f.seats]})),
+    activeCoach:0,
+  };
+});
+
+// ============ STATE ============
+let curFilter='all', curSort='num';
+let activeTrain=null, modalFam='';
+
+// ============ FLEET ============
+function renderFleet(){
+  const q=(document.getElementById('srch').value||'').toLowerCase();
+  let list=[...TRAINS];
+  if(curFilter!=='all') list=list.filter(t=>t.status===curFilter);
+  if(q) list=list.filter(t=>t.num.includes(q)||t.name.toLowerCase().includes(q)||t.from.toLowerCase().includes(q)||t.to.toLowerCase().includes(q));
+  if(curSort==='num') list.sort((a,b)=>a.num.localeCompare(b.num));
+  else if(curSort==='name') list.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(curSort==='eff') list.sort((a,b)=>TD[b.id].eff-TD[a.id].eff);
+  else if(curSort==='rac') list.sort((a,b)=>TD[b.id].rac-TD[a.id].rac);
+
+  const g=document.getElementById('trains-grid');
+  g.innerHTML='';
+  list.forEach(t=>{
+    const d=TD[t.id];
+    const card=document.createElement('div');
+    card.className=`tcard ${t.status}`;
+    const sl=t.status==='running'?'RUNNING':t.status==='delayed'?`DELAYED +${t.delay}m`:'ARRIVED';
+    const confP=Math.round(d.conf/d.total*100);
+    const racP=Math.round(d.rac/d.total*100);
+    const vacP=Math.round(d.vac/d.total*100);
+    const swP=Math.min(Math.round(d.sw/d.total*200),100);
+    card.innerHTML=`
+      <div class="tc-head">
+        <div class="tc-top">
+          <div><div class="tc-num">${t.num} · ${t.type}</div><div class="tc-name">${t.name}</div></div>
+          <div class="tc-pill ${t.status}">${sl}</div>
+        </div>
+        <div class="tc-route">
+          <span class="tc-orig">${t.from}</span>
+          <div class="tc-line"></div>
+          <span class="tc-dest">${t.to}</span>
+        </div>
+        <div class="tc-times">
+          <span>DEP ${t.dep}</span>
+          <span class="curr">▶ ${t.stations[Math.min(t.currSt,t.stations.length-1)]}</span>
+          <span>ARR ${t.arr}</span>
+        </div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-progress">
+          <div class="tc-pbar"><div class="tc-pfill" style="width:${t.progress}%"></div></div>
+          <div class="tc-plabels"><span>${t.stations[0]}</span><span class="mid">${t.progress}% done</span><span>${t.stations[t.stations.length-1]}</span></div>
+        </div>
+        <div class="tc-minibars">
+          <div class="mbar"><div class="mbar-track"><div class="mbar-fill" style="width:${confP}%;background:var(--confirmed)"></div></div><div class="mbar-val" style="color:var(--confirmed)">${d.conf}</div><div class="mbar-label">Confirmed</div></div>
+          <div class="mbar"><div class="mbar-track"><div class="mbar-fill" style="width:${racP}%;background:var(--rac)"></div></div><div class="mbar-val" style="color:var(--rac)">${d.rac}</div><div class="mbar-label">RAC</div></div>
+          <div class="mbar"><div class="mbar-track"><div class="mbar-fill" style="width:${vacP}%;background:var(--vacant)"></div></div><div class="mbar-val" style="color:var(--vacant)">${d.vac}</div><div class="mbar-label">No-Show</div></div>
+          <div class="mbar"><div class="mbar-track"><div class="mbar-fill" style="width:${swP}%;background:var(--moving)"></div></div><div class="mbar-val" style="color:var(--moving)">${d.sw}</div><div class="mbar-label">Swaps</div></div>
+        </div>
+        <div class="tc-foot">
+          <div class="tc-info">Coaches: <span>${t.coaches.length}</span> · Eff: <span>${d.eff}%</span> · Upgraded: <span>${d.upg}</span></div>
+          <button class="manage-btn" onclick="openTrain('${t.id}')">MANAGE →</button>
+        </div>
+      </div>`;
+    g.appendChild(card);
+  });
+
+  // Global stats
+  let gt=0,gc=0,gr=0,gv=0;
+  TRAINS.forEach(t=>{gt+=TD[t.id].total;gc+=TD[t.id].conf;gr+=TD[t.id].rac;gv+=TD[t.id].vac;});
+  document.getElementById('gs-total').textContent=gt.toLocaleString();
+  document.getElementById('gs-conf').textContent=gc.toLocaleString();
+  document.getElementById('gs-rac').textContent=gr.toLocaleString();
+  document.getElementById('gs-vac').textContent=gv.toLocaleString();
+  document.getElementById('active-count').textContent=TRAINS.filter(t=>t.status==='running').length;
+}
+
+function setF(f,btn){curFilter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderFleet();}
+
+// ============ DETAIL ============
+function openTrain(id){
+  activeTrain=TRAINS.find(t=>t.id===id);
+  const d=TD[id];
+  document.getElementById('fleet-page').classList.remove('active');
+  document.getElementById('detail-page').classList.add('active');
+  window.scrollTo(0,0);
+
+  document.getElementById('d-name').textContent=`${activeTrain.num} · ${activeTrain.name}`;
+  document.getElementById('d-route').textContent=`${activeTrain.from} → ${activeTrain.to} · DEP ${activeTrain.dep} · ARR ${activeTrain.arr}`;
+  const pill=document.getElementById('d-pill');
+  pill.textContent=activeTrain.status==='running'?'● RUNNING':activeTrain.status==='delayed'?`● DELAYED +${activeTrain.delay}m`:'● ARRIVED';
+  pill.className='det-pill badge '+(activeTrain.status==='running'?'bg':activeTrain.status==='delayed'?'bw':'');
+
+  document.getElementById('ds-c').textContent=d.conf;
+  document.getElementById('ds-r').textContent=d.rac;
+  document.getElementById('ds-v').textContent=d.vac;
+  document.getElementById('ds-s').textContent=d.sw;
+  document.getElementById('ds-u').textContent=d.upg;
+  document.getElementById('consent-stat').textContent=`● ${d.sw} PENDING`;
+
+  document.getElementById('jfill').style.width=activeTrain.progress+'%';
+  document.getElementById('d-eta').textContent=activeTrain.status==='arrived'?'Journey Complete':activeTrain.status==='delayed'?`Delayed +${activeTrain.delay}m`:'On Time';
+
+  const js=document.getElementById('jstations');
+  js.innerHTML='';
+  activeTrain.stations.forEach((s,i)=>{
+    const sp=document.createElement('span');
+    sp.textContent=s;
+    if(i<activeTrain.currSt) sp.className='done';
+    else if(i===activeTrain.currSt) sp.className='curr';
+    js.appendChild(sp);
+  });
+
+  // Coach ribbon
+  const rb=document.getElementById('coach-ribbon');
+  rb.innerHTML='';
+  activeTrain.coaches.forEach((c,i)=>{
+    const btn=document.createElement('button');
+    btn.className='cpill'+(i===0?' on':'');
+    btn.textContent=c;
+    btn.onclick=()=>{
+      document.querySelectorAll('.cpill').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      document.getElementById('coach-lbl').textContent=c+' Active';
+      renderSeats(mkSeats(8));
+    };
+    rb.appendChild(btn);
+  });
+  document.getElementById('coach-lbl').textContent=activeTrain.coaches[0]+' Active';
+
+  renderSeats(d.seats);
+  document.getElementById('eff-pct').textContent=d.eff+'%';
+  document.getElementById('eff-bar').style.width=d.eff+'%';
+  document.getElementById('e-tot').textContent=d.total;
+  document.getElementById('e-wst').textContent=d.vac;
+
+  const sc=d.fams.filter(f=>f.split).length;
+  document.getElementById('split-badge').textContent=`${sc} Split`;
+
+  // Reset panels
+  document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('on',i===0));
+  document.getElementById('fam-panel').style.display='';
+  document.getElementById('racq-panel').style.display='none';
+  document.getElementById('feed-panel').style.display='none';
+
+  renderFams(d.fams);
+  renderRAC(d.racQ);
+  renderFeed(d.acts);
+  document.getElementById('scan-result').style.display='none';
+}
+
+function goFleet(){
+  document.getElementById('detail-page').classList.remove('active');
+  document.getElementById('fleet-page').classList.add('active');
+  activeTrain=null;
+}
+
+function renderSeats(grid){
+  const c=document.getElementById('seat-grid');
+  c.innerHTML='';
+  grid.forEach((comp,ci)=>{
+    const div=document.createElement('div');
+    div.className='comp';
+    div.innerHTML=`<div class="comp-lbl">COMPARTMENT ${ci+1}</div><div class="srow"></div>`;
+    const row=div.querySelector('.srow');
+    comp.forEach(s=>{
+      const el=document.createElement('div');
+      el.className=`seat ${s.status}`;
+      el.title=`Seat ${s.num} ${s.berth}`;
+      el.innerHTML=`<div class="snum">${s.num}</div><div class="sberth">${s.berth}</div>`;
+      el.onclick=()=>{
+        document.querySelectorAll('.seat.sel').forEach(x=>x.classList.remove('sel'));
+        el.classList.add('sel');
+        if(s.status==='vacant') toast('⚠️','No-Show',`Seat ${s.num} flagged for RAC upgrade.`,'warn');
+        else if(s.status==='rac') toast('🎫','RAC',`Seat ${s.num} is RAC. Checking upgrades…`,'cyan');
+        else if(s.status==='moving') toast('🔄','Swap Pending',`Seat ${s.num} awaiting consent.`,'cyan');
+      };
+      row.appendChild(el);
+    });
+    c.appendChild(div);
+  });
+}
+
+function renderFams(fams){
+  const p=document.getElementById('fam-panel');
+  p.innerHTML='';
+  fams.forEach(f=>{
+    const div=document.createElement('div');
+    div.className=`fitem ${f.split?'split':'together'}`;
+    const sh=f.seats.map(s=>`<span class="ftag ${f.split?'diff':'same'}">${s}</span>`).join('');
+    const bh=f.split?`<button class="fbtn2" onclick="openModal('${f.name}')">⟳ Request Re-Cluster</button>`:'';
+    div.innerHTML=`<div class="fhead"><div class="fname">${f.name} · PNR ${f.pnr}</div><div class="badge ${f.split?'bw':'bg'}">${f.split?'SPLIT':'TOGETHER'}</div></div><div class="fseats">${sh}</div>${bh}`;
+    p.appendChild(div);
+  });
+}
+
+function renderRAC(list){
+  const p=document.getElementById('racq-panel');
+  p.innerHTML='';
+  list.forEach((r,i)=>{
+    const div=document.createElement('div');
+    div.className='ritem';
+    div.innerHTML=`
+      <div class="rav">🧑</div>
+      <div class="rinfo"><div class="rname">${r.name}</div><div class="rdet">${r.det}</div></div>
+      <div class="upbadge" id="ub-${i}" onclick="doUpgrade(${i})">UPGRADE →</div>`;
+    p.appendChild(div);
+  });
+}
+
+function renderFeed(acts){
+  const p=document.getElementById('feed-panel');
+  p.innerHTML='';
+  acts.forEach(a=>{
+    const div=document.createElement('div');
+    div.className='aitem';
+    div.innerHTML=`<div class="aico ${a.t}">${a.i}</div><div><div class="atxt">${a.msg}</div><div class="atime">${a.time}</div></div>`;
+    p.appendChild(div);
+  });
+}
+
+function dtab(btn,panel){
+  document.querySelectorAll('.stab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  ['fam','racq','feed'].forEach(p=>document.getElementById(p+'-panel').style.display=p===panel?'':'none');
+}
+
+// ============ SCAN ============
+const DEMO=[
+  {n:'Rajesh Kumar',d:'PNR 334455 · Seat 24 LB · NDLS→MMCT'},
+  {n:'Sunita Patel',d:'PNR 887722 · Seat 7 UB · NDLS→MMCT'},
+  {n:'Arjun Singh',d:'PNR 112233 · Seat 44 SL · NDLS→Surat'},
+  {n:'Kavita Rao',d:'PNR 556677 · Seat 2 LB · Kota→MMCT'},
+];
+function simulateScan(){
+  const p=DEMO[Math.floor(Math.random()*DEMO.length)];
+  document.getElementById('scan-name').textContent=p.n;
+  document.getElementById('scan-det').textContent=p.d;
+  document.getElementById('scan-result').style.display='block';
+  toast('✅','Validated',`${p.n} confirmed at seat.`,'green');
+  if(activeTrain){
+    const d=TD[activeTrain.id];
+    d.acts.unshift({t:'scan',i:'✅',msg:`<strong>${p.n}</strong> validated at assigned seat`,time:'Just now'});
+    renderFeed(d.acts);
+  }
+}
+
+// ============ MODAL ============
+function openModal(fam){
+  modalFam=fam;
+  document.getElementById('mtitle').textContent=`Re-Cluster — ${fam}`;
+  document.getElementById('mdesc').textContent=`System found compatible seats to bring ${fam} together. Both passengers must consent before seats change.`;
+  document.getElementById('p1n').textContent='Passenger A';
+  document.getElementById('p1s').textContent='Current → Nearby seat';
+  document.getElementById('p2n').textContent='Passenger B';
+  document.getElementById('p2s').textContent='Current → Available seat';
+  document.getElementById('cmodal').classList.add('on');
+}
+function closeModal(){document.getElementById('cmodal').classList.remove('on');}
+function acceptSwap(){
+  closeModal();
+  toast('🔄','Swap Confirmed',`${modalFam} seats re-clustered.`,'green');
+  if(activeTrain){
+    const d=TD[activeTrain.id];
+    d.sw=Math.max(0,d.sw-1);
+    document.getElementById('ds-s').textContent=d.sw;
+    document.getElementById('consent-stat').textContent=`● ${d.sw} PENDING`;
+    d.acts.unshift({t:'swap',i:'🔄',msg:`<strong>${modalFam}</strong> consented — re-clustered successfully`,time:'Just now'});
+    renderFeed(d.acts);
+    d.fams.forEach(f=>{if(f.name===modalFam)f.split=false;});
+    renderFams(d.fams);
+    const sc=d.fams.filter(f=>f.split).length;
+    document.getElementById('split-badge').textContent=`${sc} Split`;
+  }
+}
+
+// ============ RAC UPGRADE ============
+function doUpgrade(i){
+  const btn=document.getElementById(`ub-${i}`);
+  if(!btn||btn.dataset.done) return;
+  btn.dataset.done='1';
+  const d=activeTrain?TD[activeTrain.id]:null;
+  const name=d?d.racQ[i].name:'Passenger';
+  btn.textContent='✓ DONE';
+  btn.style.cssText='background:rgba(57,255,143,.18);color:var(--confirmed);border-color:rgba(57,255,143,.4);cursor:default;';
+  btn.onclick=null;
+  toast('⬆️','Upgraded',`${name} moved to confirmed seat.`,'green');
+  if(d){
+    d.upg++;d.rac=Math.max(0,d.rac-1);
+    document.getElementById('ds-r').textContent=d.rac;
+    document.getElementById('ds-u').textContent=d.upg;
+    d.acts.unshift({t:'upgrade',i:'⬆️',msg:`<strong>${name}</strong> upgraded RAC → confirmed seat`,time:'Just now'});
+    renderFeed(d.acts);
+  }
+}
+
+// ============ TOAST ============
+function toast(icon,title,msg,color='cyan'){
+  const C={green:'var(--confirmed)',cyan:'var(--accent)',warn:'var(--warn)',red:'var(--vacant)'};
+  const tc=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast';
+  t.style.borderColor=C[color]||C.cyan;
+  t.innerHTML=`<div class="ticon">${icon}</div><div class="ttxt"><strong>${title}</strong>${msg}</div>`;
+  tc.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(()=>t.remove(),500);},3500);
+}
+
+// ============ CLOCK ============
+function tick(){document.getElementById('gclock').textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
+setInterval(tick,1000);tick();
+
+// ============ LIVE SIM ============
+setInterval(()=>{
+  TRAINS.forEach(t=>{
+    const d=TD[t.id];
+    if(d.rac>0&&Math.random()>.7){d.rac--;d.conf++;d.upg++;}
+  });
+  if(!activeTrain) renderFleet();
+},12000);
+
+// ============ INIT ============
+renderFleet();
+</script>
+</body>
+</html>
