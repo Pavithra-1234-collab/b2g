@@ -1,0 +1,262 @@
+# Smart Railway Seat Reallocation System (MVP)
+
+An intelligent backend system that simulates railway seat verification and dynamic seat reallocation using Node.js, Express, and MongoDB.
+
+---
+
+## Project Overview
+
+This project implements a Smart Railway Seat Management System where:
+
+- Seats are assigned to passengers
+- Ticket examiner verifies boarding
+- No-show passengers are detected
+- Seats are marked as EMPTY
+- Empty seats are dynamically rebooked
+
+This is Phase 1 (MVP) of the system.
+
+---
+
+## Tech Stack
+
+- Node.js
+- Express.js
+- MongoDB
+- Mongoose
+- CORS
+- Nodemon
+
+---
+
+## Project Structure
+
+smart-railway-backend/
+│
+├── server.js
+├── package.json
+├── node_modules/
+└── README.md
+
+---
+
+## Installation & Setup
+
+### 1️Clone the Repository
+
+```bash
+git clone https://github.com/your-username/smart-railway-backend.git
+cd smart-railway-backend
+```
+
+### 2️ Install Dependencies
+
+```bash
+npm install
+```
+
+### 3️Make Sure MongoDB Is Running
+
+MongoDB should run locally at:
+
+```
+mongodb://127.0.0.1:27017
+```
+
+Database used:
+
+```
+smart-railway-mvp
+```
+
+### 4️Run the Server
+
+Development mode:
+
+```bash
+npx nodemon server.js
+```
+
+Production mode:
+
+```bash
+node server.js
+```
+
+If successful, you will see:
+
+```
+Server running on http://localhost:5000
+MongoDB Connected - smart-railway-mvp
+```
+
+---
+
+## Base URL
+
+```
+http://localhost:5000
+```
+
+---
+
+# API Endpoints (Test in Postman)
+
+---
+
+## 1. Health Check
+
+GET  
+```
+http://localhost:5000/
+```
+
+Response:
+
+```json
+{
+  "message": "🚆 Smart Railway Backend Working Perfectly"
+}
+```
+
+---
+
+## ➕ 2. Add Seat
+
+POST  
+```
+http://localhost:5000/api/add-seat
+```
+
+Body (JSON):
+
+```json
+{
+  "trainId": "12345",
+  "coach": "S1",
+  "seatNumber": "1",
+  "pnr": "PNR001",
+  "passengerName": "Rahul",
+  "boardingStation": "Chennai"
+}
+```
+
+---
+
+## ✔ 3. Verify Seat (Passenger Boarded)
+
+POST  
+```
+http://localhost:5000/api/verify-seat
+```
+
+Body:
+
+```json
+{
+  "pnr": "PNR001"
+}
+```
+
+---
+
+## 4. Mark No-Show (Convert to EMPTY)
+
+POST  
+```
+http://localhost:5000/api/mark-no-show/12345
+```
+
+Body:
+
+```json
+{
+  "nextStation": "Bangalore"
+}
+```
+
+This converts unverified passengers into EMPTY seats.
+
+---
+
+## 5. View Empty Seats
+
+GET  
+```
+http://localhost:5000/api/empty-seats/12345/Bangalore
+```
+
+---
+
+## 6. Rebook Empty Seat
+
+POST  
+```
+http://localhost:5000/api/rebook-seat
+```
+
+Body:
+
+```json
+{
+  "seatId": "MONGO_OBJECT_ID",
+  "newPassengerName": "Anita",
+  "newPnr": "PNR100",
+  "boardingStation": "Bangalore"
+}
+```
+
+---
+
+# Recommended Testing Flow
+
+1. Add 10–20 seats
+2. Verify some passengers
+3. Mark No-Show
+4. Fetch Empty Seats
+5. Rebook seat
+
+---
+
+# MongoDB Schema
+
+```js
+{
+  trainId: String,
+  coach: String,
+  seatNumber: String,
+  pnr: String,
+  passengerName: String,
+  boardingStation: String,
+  verified: Boolean,
+  status: "CONFIRMED" | "EMPTY",
+  availableFromStation: String
+}
+```
+
+---
+
+# Phase 1 Features
+
+- Add Seat
+- Verify Passenger Boarding
+- Detect No-Show
+- Convert Seat to EMPTY
+- View Empty Seats
+- Rebook Empty Seat
+
+---
+
+# Future Enhancements (Phase 2)
+
+- JWT Authentication
+- Admin Dashboard
+- Frontend UI (React)
+- Deployment (Render / Railway / AWS)
+- AI-based seat prediction logic
+
+---
+
+## Author
+
+Smart Railway Backend – MVP Implementation
